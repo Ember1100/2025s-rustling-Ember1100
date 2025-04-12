@@ -22,7 +22,7 @@ where
     pub fn new(comparator: fn(&T, &T) -> bool) -> Self {
         Self {
             count: 0,
-            items: vec![T::default()],
+            items: vec![T::default()], // Index 0 is unused
             comparator,
         }
     }
@@ -38,11 +38,19 @@ where
     pub fn add(&mut self, value: T) {
         self.items.push(value);
         self.count += 1;
-        let mut idx = self.count;
+        self.bubble_up(self.count);
+    }
 
-        while idx > 1 && (self.comparator)(&self.items[idx], &self.items[self.parent_idx(idx)]) {
-            self.items.swap(idx, self.parent_idx(idx));
-            idx = self.parent_idx(idx);
+    fn bubble_up(&mut self, idx: usize) {
+        let mut idx = idx;
+        while idx > 1 {
+            let parent_idx = self.parent_idx(idx);
+            if (self.comparator)(&self.items[idx], &self.items[parent_idx]) {
+                self.items.swap(idx, parent_idx);
+                idx = parent_idx;
+            } else {
+                break;
+            }
         }
     }
 
@@ -59,7 +67,7 @@ where
     }
 
     fn right_child_idx(&self, idx: usize) -> usize {
-        self.left_child_idx(idx) + 1
+        idx * 2 + 1
     }
 
     fn smallest_child_idx(&self, idx: usize) -> usize {
@@ -70,6 +78,34 @@ where
             right
         } else {
             left
+        }
+    }
+
+    pub fn remove_root(&mut self) -> Option<T> {
+        if self.is_empty() {
+            return None;
+        }
+
+        let root = self.items.swap_remove(1); // Move last element to root
+        self.count -= 1;
+
+        if self.count > 0 {
+            self.bubble_down(1); // Restore heap property
+        }
+
+        Some(root)
+    }
+
+    fn bubble_down(&mut self, idx: usize) {
+        let mut idx = idx;
+        while self.children_present(idx) {
+            let smallest_child = self.smallest_child_idx(idx);
+            if (self.comparator)(&self.items[smallest_child], &self.items[idx]) {
+                self.items.swap(idx, smallest_child);
+                idx = smallest_child;
+            } else {
+                break;
+            }
         }
     }
 }
@@ -96,25 +132,7 @@ where
     type Item = T;
 
     fn next(&mut self) -> Option<T> {
-        if self.is_empty() {
-            return None;
-        }
-
-        let root = self.items.swap_remove(1);
-        self.count -= 1;
-
-        let mut idx = 1;
-        while self.children_present(idx) {
-            let smallest_child = self.smallest_child_idx(idx);
-            if (self.comparator)(&self.items[smallest_child], &self.items[idx]) {
-                self.items.swap(idx, smallest_child);
-                idx = smallest_child;
-            } else {
-                break;
-            }
-        }
-
-        Some(root)
+        self.remove_root()
     }
 }
 
@@ -126,7 +144,7 @@ impl MinHeap {
     where
         T: Default + Ord,
     {
-        Heap::new(|a, b| a < b)
+        Heap::new_min()
     }
 }
 
@@ -138,10 +156,9 @@ impl MaxHeap {
     where
         T: Default + Ord,
     {
-        Heap::new(|a, b| a > b)
+        Heap::new_max()
     }
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
